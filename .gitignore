@@ -1,0 +1,14 @@
+# Temporary backup folders
+tmp_backup_*/
+
+# Hash database
+photo_hashes.txt
+
+# Files to delete list
+files_to_delete.txt
+
+# MacOS system files
+.DS_Store
+
+# Linux system files
+*.swp
