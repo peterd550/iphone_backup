@@ -3,7 +3,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # =====================================================================
-# Optimized iPhone Backup + Parallel Cleanup Script
+# Optimized iPhone Backup + Parallel Cleanup Script (DCIM only)
 # - Mounts iPhone at /mnt/iphone
 # - Deduplicates with parallel hashing
 # - Uses rsync for fast backup
@@ -16,9 +16,10 @@ IFS=$'\n\t'
 # -------------------------
 # Configuration
 # -------------------------
-DRY_RUN=true                     # true = dry run, false = actual backup & deletion
-MOUNT_POINT="/mnt/iphone"
-BACKUP_ROOT="/mnt/IPHONE_Backups"
+DRY_RUN=false                    # true = dry run, false = actual backup & deletion
+MOUNT_POINT="/media/pete/New Volume/iphone"
+BACKUP_ROOT="/media/pete/New Volume/IPHONE_Backups"
+DCIM_FOLDER="$MOUNT_POINT/DCIM"  # Only backup DCIM folder
 HASH_DB="$BACKUP_ROOT/photo_hashes.txt"
 TMP_BACKUP_DIR="$BACKUP_ROOT/tmp_backup_$(date +%Y-%m-%d_%H-%M)"
 CUTOFF_DATE_IPHONE=$(date -d "12 months ago" +%s)
@@ -42,13 +43,13 @@ else
 fi
 
 # -------------------------
-# Backup new files using rsync
+# Backup DCIM folder using rsync
 # -------------------------
-echo "📦 Backing up new photos/videos..."
+echo "📦 Backing up DCIM folder..."
 if [ "$DRY_RUN" = true ]; then
-    rsync -avn --progress "$MOUNT_POINT"/ "$TMP_BACKUP_DIR"/
+    rsync -avn --progress "$DCIM_FOLDER"/ "$TMP_BACKUP_DIR"/
 else
-    rsync -a --ignore-existing --progress "$MOUNT_POINT"/ "$TMP_BACKUP_DIR"/
+    rsync -a --ignore-existing --progress "$DCIM_FOLDER"/ "$TMP_BACKUP_DIR"/
 fi
 
 # -------------------------
@@ -78,8 +79,8 @@ fi
 # -------------------------
 # Delete files older than 12 months (parallel)
 # -------------------------
-echo "🧹 Deleting iPhone files older than 12 months..."
-EXIF_METADATA=$(exiftool -r -DateTimeOriginal -CreateDate -MediaCreateDate -QuickTime:CreateDate "$MOUNT_POINT" 2>/dev/null)
+echo "🧹 Deleting old photos/videos from iPhone (DCIM only)..."
+EXIF_METADATA=$(exiftool -r -DateTimeOriginal -CreateDate -MediaCreateDate -QuickTime:CreateDate "$DCIM_FOLDER" 2>/dev/null)
 
 delete_file() {
     local file="$1"
@@ -105,7 +106,7 @@ while IFS= read -r -d '' file; do
     if (( FILE_DATE_SECONDS > 0 && FILE_DATE_SECONDS < CUTOFF_DATE_IPHONE )); then
         echo "$file|$FILE_DATE_RAW" >> "$DELETE_LIST"
     fi
-done < <(find "$MOUNT_POINT" -type f -print0)
+done < <(find "$DCIM_FOLDER" -type f -print0)
 
 TOTAL_DELETE=$(wc -l < "$DELETE_LIST")
 echo "Total files marked for deletion: $TOTAL_DELETE"
