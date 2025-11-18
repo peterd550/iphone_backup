@@ -27,8 +27,8 @@ This script mounts your iPhone via USB, backs up new photos/videos to a **timest
 - Dependencies:
 
 ```bash
-sudo apt update
-sudo apt install ifuse libimobiledevice6 libimobiledevice-utils fuse3 rsync exiftool
+sudo apt -y update
+sudo apt -y install ifuse libimobiledevice6 libimobiledevice-utils fuse3 rsync exiftool
 
 
 ## Execution of script
