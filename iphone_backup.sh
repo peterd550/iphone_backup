@@ -15,8 +15,8 @@ IFS=$'\n\t'
 # -------------------------
 # Prerequisites (uncomment if you want the script to install them)
 # -------------------------
-# sudo apt -y update
-# sudo apt -y install ifuse libimobiledevice6 libimobiledevice-utils fuse3 rsync exiftool notify-osd dbus-x11 parallel
+sudo apt -y update
+sudo apt -y install ifuse libimobiledevice6 libimobiledevice-utils fuse3 rsync exiftool notify-osd dbus-x11 parallel
 
 # -------------------------
 # Configuration
@@ -56,7 +56,7 @@ if [ ! -d "$DCIM_FOLDER" ]; then
     echo "Make sure the phone is unlocked, trusted, and the mount path is correct."
     exit 2
 fi
-exit 8
+
 # -------------------------
 # Backup DCIM folder using rsync
 # -------------------------
@@ -163,15 +163,46 @@ else
                 printf "[DRY RUN] Would delete: %s (Date: %s)\n" "$f" "$d";
             else
                 sudo rm -f -- "$f" && printf "Deleted: %s\n" "$f";
-            fi'
+            fi
 fi
 
 # final notification
 if [ "$DRY_RUN" = false ]; then
+    echo "✅ Deletion complete: $TOTAL_DELETE files deleted."
     command -v notify-send >/dev/null 2>&1 && notify-send "iPhone Cleanup Complete" "Deleted $TOTAL_DELETE photos/videos older than 12 months from iPhone."
 else
     echo "✅ Dry run complete: no files were deleted."
 fi
+
+delete_empty_dcim_folders() {
+    ###DELETE EMPTY DCIM FOLDERS FUNCTION###
+    ###DELETE EMPTY DCIM FOLDERS FUNCTION###
+    ###DELETE EMPTY DCIM FOLDERS FUNCTION###
+    sleep 10
+    local dcim_path="${DCIM_FOLDER}"
+
+    echo "🧹 Scanning for empty DCIM folders on iPhone..."
+
+    # Find and remove empty folders
+    empty_dirs=$(find "$dcim_path" -type d -empty 2>/dev/null)
+
+    if [[ -z "$empty_dirs" ]]; then
+        echo "✨ No empty DCIM folders found."
+        return
+    fi
+
+    echo "📁 Empty folders found:"
+    echo "$empty_dirs"
+
+    echo "🗑️ Deleting empty folders..."
+    while IFS= read -r dir; do
+        rmdir "$dir" 2>/dev/null && \
+        echo "   ✔ Removed: $dir" || \
+        echo "   ⚠️ Failed to remove: $dir"
+    done <<< "$empty_dirs"
+
+    echo "✅ Empty DCIM folder cleanup complete!"
+}
 
 # -------------------------
 # Unmount iPhone
