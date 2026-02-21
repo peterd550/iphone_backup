@@ -54,13 +54,13 @@ chmod +x iphone_backup.sh
 4. Run with custom parallelism:
 
 ```bash
-./iphone_backup.sh --cores 8
+./iphone_backup.sh --cores 3
 ```
 
 5. Combine flags:
 
 ```bash
-./iphone_backup.sh --dry-run --cores 8
+./iphone_backup.sh --dry-run --cores 3
 ```
 
 Tips
