@@ -66,7 +66,7 @@ chmod +x iphone_backup.sh
 Tips
 ----
 - To change deletion age, edit the `CUTOFF_DATE_IPHONE` assignment (e.g. use `date -d "6 months ago" +%s`).
-- Use `--cores N` to adjust parallelism based on your CPU (e.g. `--cores 8` for faster hashing/deletions).
+- Use `--cores N` to adjust parallelism based on your CPU (e.g. `--cores 4` for faster hashing/deletions).
 - If you want EXIF-based timestamps for deletion, install `exiftool`; the script auto-detects it.
 - The script appends logs to `LOG_FILE` and records deleted/dry-run items in `DELETED_FILES_LIST`.
 - The script will automatically unmount the iPhone on exit (normal or interrupted).
@@ -97,7 +97,7 @@ Examples
 - Dry run with increased parallelism:
 
 ```bash
-./iphone_backup.sh --dry-run --cores 8
+./iphone_backup.sh --dry-run --cores 4
 ```
 
 - Run with custom core count (for faster performance on high-CPU systems):
