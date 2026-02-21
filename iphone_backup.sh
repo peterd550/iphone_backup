@@ -15,9 +15,87 @@ IFS=$'\n\t'
 # =====================================================================
 
 # -------------------------
+# CLI Argument Parsing
+# -------------------------
+usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo "Options:"
+    echo "  --dry-run       Preview changes without deleting or archiving"
+    echo "  --cores N       Number of parallel workers (default: 4)"
+    echo "  --help          Show this help message"
+}
+
+DRY_RUN=false
+PARALLEL_CORES=4
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --cores)
+            PARALLEL_CORES="${2:-4}"
+            if ! [[ "$PARALLEL_CORES" =~ ^[0-9]+$ ]] || [ "$PARALLEL_CORES" -lt 1 ]; then
+                echo "[ERROR] --cores must be a positive integer, got: $PARALLEL_CORES"
+                exit 1
+            fi
+            shift 2
+            ;;
+        --help|-h)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "[ERROR] Unknown option: $1"
+            usage
+            exit 1
+            ;;
+    esac
+done
+
+# -------------------------
+# Dependency Check
+# -------------------------
+check_dependencies() {
+    local missing_deps=()
+    local required_cmds=("ifuse" "rsync" "sha256sum" "find" "tar" "mount" "sudo")
+    
+    for cmd in "${required_cmds[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            missing_deps+=("$cmd")
+        fi
+    done
+    
+    if [ ${#missing_deps[@]} -gt 0 ]; then
+        echo "[ERROR] Missing required dependencies: ${missing_deps[*]}"
+        echo "[INFO] Install with: sudo apt install ifuse rsync coreutils"
+        exit 1
+    fi
+}
+
+check_dependencies
+
+# -------------------------
+# Cleanup on Interrupt
+# -------------------------
+cleanup_on_exit() {
+    local exit_code=$?
+    if [ $exit_code -ne 0 ]; then
+        echo "[!] Script interrupted or failed (exit code: $exit_code)"
+    fi
+    if mount | grep -qF "$MOUNT_POINT" 2>/dev/null; then
+        echo "[*] Unmounting iPhone..."
+        sudo fusermount3 -u "$MOUNT_POINT" 2>/dev/null || sudo umount "$MOUNT_POINT" 2>/dev/null || true
+    fi
+    exit $exit_code
+}
+
+trap cleanup_on_exit EXIT INT TERM
+
+# -------------------------
 # Configuration
 # -------------------------
-DRY_RUN=false
 MOUNT_POINT="/media/pete/New Volume/iphone"
 BACKUP_ROOT="/media/pete/New Volume/IPHONE_Backups"
 DCIM_FOLDER="$MOUNT_POINT/DCIM"
@@ -25,7 +103,6 @@ HASH_DB="$BACKUP_ROOT/photo_hashes.txt"
 TMP_BACKUP_DIR="$BACKUP_ROOT/tmp_backup_$(date +%Y-%m-%d_%H-%M)"
 CUTOFF_DATE_IPHONE=$(date -d "12 months ago" +%s)
 ARCHIVE_NAME="$BACKUP_ROOT/Archive_$(date +%Y-%m-%d_%H-%M).tar.gz"
-PARALLEL_CORES=4
 REPORT_FILE="$BACKUP_ROOT/iPhone_backup_report_$(date +%Y-%m-%d_%H-%M).html"
 DELETED_FILES_LIST="$BACKUP_ROOT/deleted_files.list"
 LOG_FILE="$BACKUP_ROOT/iPhone_backup_$(date +%Y-%m-%d_%H-%M).log"
@@ -45,10 +122,18 @@ log "🔌 Mounting iPhone..."
 if mount | grep -qF "$MOUNT_POINT"; then
     log "[✓] Already mounted."
 else
-    sudo ifuse "$MOUNT_POINT"
+    sudo ifuse -o allow_other "$MOUNT_POINT"
 fi
 
-[ ! -d "$DCIM_FOLDER" ] && { log "[ERROR] DCIM folder not found!"; exit 2; }
+if [ ! -d "$DCIM_FOLDER" ]; then
+    log "[ERROR] DCIM folder not found!"
+    log "[DEBUG] Mount point contents:"
+    ls -la "$MOUNT_POINT" 2>&1 | tee -a "$LOG_FILE" || true
+    log "[DEBUG] Mounted filesystems:"
+    mount | grep -F "$MOUNT_POINT" | tee -a "$LOG_FILE" || true
+    log "[DEBUG] Check: is iPhone unlocked and 'Trust' approved? Run: idevicepair validate"
+    exit 2
+fi
 
 # -------------------------
 # Backup DCIM folder
@@ -175,8 +260,10 @@ log "HTML report generated: $REPORT_FILE"
 # -------------------------
 # Unmount iPhone
 # -------------------------
-sudo fusermount3 -u "$MOUNT_POINT" 2>/dev/null || sudo umount "$MOUNT_POINT" 2>/dev/null || true
-log "📴 iPhone unmounted."
+if mount | grep -qF "$MOUNT_POINT" 2>/dev/null; then
+    sudo fusermount3 -u "$MOUNT_POINT" 2>/dev/null || sudo umount "$MOUNT_POINT" 2>/dev/null || true
+    log "📴 iPhone unmounted."
+fi
 
 # Open report in Chrome
 if command -v google-chrome >/dev/null 2>&1; then
@@ -188,4 +275,3 @@ else
 fi
 
 log "✅ Backup script finished. Log file: $LOG_FILE"
-exit 0
